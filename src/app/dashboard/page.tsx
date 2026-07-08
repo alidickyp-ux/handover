@@ -1,0 +1,189 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import StatsCard from '@/components/dashboard/StatsCard';
+
+interface DashboardStats {
+  totalToday: number;
+  activeSessions: number;
+  pendingReconcile: number;
+  totalItems: number;
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalToday: 0,
+    activeSessions: 0,
+    pendingReconcile: 0,
+    totalItems: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
+      // Total handover hari ini
+      const { count: totalToday } = await supabase
+        .from('history_logs')
+        .select('*', { count: 'exact', head: true })
+        .gte('sorting_at', todayISO);
+
+      // Sesi aktif
+      const { count: activeSessions } = await supabase
+        .from('sorting_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'RUNNING');
+
+      // Pending reconcile
+      const { count: pendingReconcile } = await supabase
+        .from('sorting_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'CLOSED');
+
+      // Total items
+      const { count: totalItems } = await supabase
+        .from('sorting_details')
+        .select('*', { count: 'exact', head: true });
+
+      setStats({
+        totalToday: totalToday || 0,
+        activeSessions: activeSessions || 0,
+        pendingReconcile: pendingReconcile || 0,
+        totalItems: totalItems || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex items-center gap-3 text-slate-400">
+          <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <span className="text-sm font-medium">Memuat dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <header className="flex justify-between items-center pb-6 border-b border-slate-200/50">
+        <div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent tracking-tight">
+            Dashboard Overview
+          </h1>
+          <p className="text-sm text-slate-500 mt-1 font-medium">
+            Ringkasan operasional sorting dan handover system
+          </p>
+        </div>
+        <div className="text-sm text-slate-500 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-200/50 shadow-sm">
+          {new Date().toLocaleDateString('id-ID', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        </div>
+      </header>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          title="Handover Hari Ini"
+          value={stats.totalToday}
+          color="emerald"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
+        <StatsCard
+          title="Sesi Aktif"
+          value={stats.activeSessions}
+          color="blue"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          }
+        />
+        <StatsCard
+          title="Pending Reconcile"
+          value={stats.pendingReconcile}
+          color="amber"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
+        <StatsCard
+          title="Total Items"
+          value={stats.totalItems}
+          color="violet"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          }
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl shadow-slate-200/30 p-6 border border-white/50">
+          <h2 className="font-bold text-slate-800 text-sm mb-4">Akses Cepat Mobile</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={() => router.push('/mobile/scan')}
+              className="p-4 bg-gradient-to-br from-indigo-500 to-violet-500 text-white rounded-xl shadow-lg shadow-indigo-200/50 hover:shadow-xl transition-all duration-200 text-left"
+            >
+              <div className="text-2xl mb-1">📱</div>
+              <p className="font-semibold text-sm">Scan Sorting</p>
+              <p className="text-xs opacity-80">Mobile Module</p>
+            </button>
+            <button 
+              onClick={() => router.push('/mobile/handover')}
+              className="p-4 bg-gradient-to-br from-emerald-500 to-teal-500 text-white rounded-xl shadow-lg shadow-emerald-200/50 hover:shadow-xl transition-all duration-200 text-left"
+            >
+              <div className="text-2xl mb-1">🚚</div>
+              <p className="font-semibold text-sm">Scan Handover</p>
+              <p className="text-xs opacity-80">Mobile Module</p>
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl shadow-slate-200/30 p-6 border border-white/50">
+          <h2 className="font-bold text-slate-800 text-sm mb-4">Status Sistem</h2>
+          <div className="flex items-center gap-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-200/50">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-sm font-medium text-emerald-700">Sistem Terhubung</span>
+            <span className="text-xs text-emerald-600 ml-auto">v2.0.0</span>
+          </div>
+          <div className="mt-3 text-xs text-slate-400">
+            Last sync: {new Date().toLocaleTimeString('id-ID')}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
