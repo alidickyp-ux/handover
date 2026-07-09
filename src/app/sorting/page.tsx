@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import OperatorShell from "@/components/mobile/OperatorShell";
 
 interface ActiveSession {
   id: string;
   session_code: string;
   transporter_name: string;
+  operator_name: string;
   total_items: number;
   created_at: string;
 }
@@ -32,10 +34,16 @@ export default function MobileSortingPage() {
       if (!session) return router.push("/");
 
       setOperatorId(session.user.id);
-      setOperatorName(session.user.user_metadata?.full_name || "Operator");
-      await fetchLiveSessions(session.user.id);
-      
-      // Auto-focus konstan untuk Android Scanner Gun
+
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("full_name")
+        .eq("id", session.user.id)
+        .single();
+
+      setOperatorName(userRow?.full_name || "Operator");
+      await fetchLiveSessions();
+
       setTimeout(() => inputRef.current?.focus(), 200);
     };
     initSorting();
@@ -45,25 +53,26 @@ export default function MobileSortingPage() {
     };
   }, [router]);
 
-  // Ambil data manifest berjalan hari ini
-  const fetchLiveSessions = useCallback(async (opId: string) => {
-    const currentOpId = opId || operatorId;
-    if (!currentOpId) return;
-
+  // HAPUS parameter - tidak perlu parameter karena pakai operatorId dari state
+  const fetchLiveSessions = useCallback(async () => {
     const { data, error } = await supabase
       .from("sorting_sessions")
       .select(`
         id,
         session_code,
         created_at,
-        master_transporters ( transporter_name )
+        master_transporters ( transporter_name ),
+        users ( full_name )
       `)
-      .eq("operator_id", currentOpId)
       .eq("status", "RUNNING")
-      .gte("created_at", new Date().toISOString().split('T')[0] + 'T00:00:00.000Z')
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error fetch sessions:', error);
+      return;
+    }
+
+    if (data) {
       const formatted = await Promise.all(
         data.map(async (s: any) => {
           const { count } = await supabase
@@ -75,6 +84,7 @@ export default function MobileSortingPage() {
             id: s.id,
             session_code: s.session_code,
             transporter_name: s.master_transporters?.transporter_name || "Unknown",
+            operator_name: s.users?.full_name || "Unknown",
             total_items: count || 0,
             created_at: s.created_at,
           };
@@ -82,9 +92,9 @@ export default function MobileSortingPage() {
       );
       setActiveSessions(formatted);
     }
-  }, [operatorId]);
+  }, []); // <-- HAPUS parameter di sini
 
-  // Eksekusi Scan Utama (Panggil RPC Database)
+  // Eksekusi Scan Utama
   const handleScanSorting = async () => {
     const cleanBarcode = barcode.trim();
     if (!cleanBarcode) return;
@@ -95,7 +105,6 @@ export default function MobileSortingPage() {
     try {
       if (navigator.vibrate) navigator.vibrate(40);
 
-      // 1. Validasi Duplikat Global
       const { data: duplicate, error: checkErr } = await supabase
         .from("sorting_details")
         .select(`session_id, sorting_sessions ( session_code, status )`)
@@ -116,7 +125,6 @@ export default function MobileSortingPage() {
         return;
       }
 
-      // 2. Tembak ke RPC Auto Prefix Router
       const { data, error } = await supabase.rpc("process_auto_sorting", {
         p_barcode: cleanBarcode,
         p_operator_id: operatorId
@@ -130,7 +138,7 @@ export default function MobileSortingPage() {
         setStatusMsg({ text: result.message, type: "error" });
       } else {
         setStatusMsg({ text: `✓ ${result.message}`, type: "success" });
-        await fetchLiveSessions(operatorId);
+        await fetchLiveSessions(); // <-- TANPA PARAMETER
       }
 
     } catch (err: any) {
@@ -138,12 +146,11 @@ export default function MobileSortingPage() {
     } finally {
       setBarcode("");
       setLoading(false);
-      // Jaga focus kembali ke kolom agar siap scan paket selanjutnya
       setTimeout(() => inputRef.current?.focus(), 30);
     }
   };
 
-  // Kunci Sesi (Pindah Status ke CLOSED agar masuk antrean Handover)
+  // Kunci Sesi
   const handleLockSession = async (id: string, code: string) => {
     const ask = window.confirm(`Kunci & Close sesi ${code}?\nData akan dipindahkan ke bagian serah terima Handover.`);
     if (!ask) return;
@@ -157,24 +164,23 @@ export default function MobileSortingPage() {
     if (!error) {
       if (navigator.vibrate) navigator.vibrate([40, 40]);
       setStatusMsg({ text: `🔒 Sesi ${code} resmi di-CLOSE!`, type: "info" });
-      await fetchLiveSessions(operatorId);
+      await fetchLiveSessions(); // <-- TANPA PARAMETER
     }
     setClosingSessionId(null);
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans text-[0.75rem] max-w-md mx-auto p-4 flex flex-col justify-between">
-      <div className="space-y-4">
-        {/* APP BAR STATUS */}
-        <header className="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700 shadow">
+    <OperatorShell>
+      <div className="text-slate-100 font-sans text-[0.75rem] p-4 space-y-4">
+
+        <div className="flex justify-between items-center px-1">
           <div>
             <p className="text-[0.6rem] text-slate-400 font-mono font-bold uppercase tracking-wider">COOL NATIVE APP</p>
             <p className="font-bold text-[0.8rem] text-white">Ops: {operatorName}</p>
           </div>
           <span className="text-[0.65rem] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded font-mono font-bold">SORTING</span>
-        </header>
+        </div>
 
-        {/* NOTIFIKASI LIVE SCAN */}
         {statusMsg.text && (
           <div className={`p-3 rounded-xl text-center font-bold font-mono transition-all border ${
             statusMsg.type === "success" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
@@ -184,7 +190,6 @@ export default function MobileSortingPage() {
           </div>
         )}
 
-        {/* INPUT HARDWARE SCANNER BOX */}
         <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-2xl">
           <form onSubmit={(e) => { e.preventDefault(); handleScanSorting(); }} className="space-y-2">
             <label className="block text-slate-400 font-bold uppercase text-[0.63rem] tracking-wider">Arahkan Laser / Tembak Barcode Paket</label>
@@ -206,7 +211,6 @@ export default function MobileSortingPage() {
           </form>
         </div>
 
-        {/* REAL-TIME SESSION COUNTER CARDS */}
         <div className="space-y-2">
           <p className="text-slate-500 text-[0.65rem] uppercase font-bold tracking-wider px-1">Sesi Running Terbuka ({activeSessions.length})</p>
           {activeSessions.length === 0 ? (
@@ -226,7 +230,7 @@ export default function MobileSortingPage() {
                       Kurir: <span className="text-slate-200 font-bold">{s.transporter_name}</span> &bull; Terkumpul: <span className="text-yellow-400 font-bold font-mono text-[0.75rem]">{s.total_items} Pcs</span>
                     </p>
                   </div>
-                  
+
                   <button
                     onClick={() => handleLockSession(s.id, s.session_code)}
                     disabled={closingSessionId === s.id}
@@ -239,8 +243,9 @@ export default function MobileSortingPage() {
             </div>
           )}
         </div>
+
+        <footer className="text-center text-[0.6rem] text-slate-600 font-mono pt-2">COOL SYSTEM V2 &bull; ROUTING ENGINE</footer>
       </div>
-      <footer className="text-center text-[0.6rem] text-slate-600 font-mono pt-4">COOL SYSTEM V2 &bull; ROUTING ENGINE</footer>
-    </div>
+    </OperatorShell>
   );
 }

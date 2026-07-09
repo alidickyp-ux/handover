@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import OperatorShell from "@/components/mobile/OperatorShell";
 
 interface ClosedSession {
   id: string;
@@ -31,7 +32,15 @@ export default function MobileHandoverPage() {
     const getSessionUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push("/");
-      setOperatorName(session.user.user_metadata?.full_name || "Operator");
+
+      // Ambil nama asli dari tabel public.users, BUKAN dari auth metadata
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("full_name")
+        .eq("id", session.user.id)
+        .single();
+
+      setOperatorName(userRow?.full_name || "Operator");
       fetchClosedSessions();
     };
     getSessionUser();
@@ -150,19 +159,20 @@ export default function MobileHandoverPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans text-[0.75rem] max-w-md mx-auto p-4 flex flex-col justify-between">
-      <div className="space-y-4">
-        <header className="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700 shadow">
+    <OperatorShell>
+      <div className="text-slate-100 font-sans text-[0.75rem] p-4 space-y-4">
+
+        <div className="flex justify-between items-center px-1">
           <div>
             <p className="text-[0.6rem] text-slate-400 font-mono font-bold uppercase tracking-wider">COOL NATIVE APP</p>
-            <p className="font-bold text-[0.8rem] text-white">Handover Lapangan</p>
+            <p className="font-bold text-[0.8rem] text-white">Handover Lapangan &bull; {operatorName}</p>
           </div>
           <span className="text-[0.65rem] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded font-mono font-bold">MOBILE</span>
-        </header>
+        </div>
 
         <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow">
           <label className="block text-slate-400 text-[0.63rem] font-bold uppercase mb-1.5">Pilih Antrean Manifest Closed</label>
-          <select 
+          <select
             onChange={(e) => handleSelectSession(e.target.value)}
             className="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg font-mono font-bold text-emerald-400 focus:outline-none"
           >
@@ -214,8 +224,9 @@ export default function MobileHandoverPage() {
             )}
           </div>
         )}
+
+        <footer className="text-center text-[0.6rem] text-slate-600 font-mono pt-2">COOL SYSTEM V2 &bull; LOGISTICS LAYER</footer>
       </div>
-      <footer className="text-center text-[0.6rem] text-slate-600 font-mono pt-4">COOL SYSTEM V2 &bull; LOGISTICS LAYER</footer>
-    </div>
+    </OperatorShell>
   );
 }

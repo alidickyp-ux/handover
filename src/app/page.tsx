@@ -30,7 +30,7 @@ export default function LoginPage() {
         } else if (role === 'SECURITY') {
           window.location.href = '/handover';
         } else {
-          window.location.href = '/sorting';
+          window.location.href = '/menu';
         }
       }
     };
@@ -76,7 +76,7 @@ export default function LoginPage() {
           } else if (role === 'SECURITY') {
             window.location.href = '/handover';
           } else {
-            window.location.href = '/sorting';
+            window.location.href = '/menu';
           }
         }, 500);
       }
@@ -168,4 +168,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-}
+} 
