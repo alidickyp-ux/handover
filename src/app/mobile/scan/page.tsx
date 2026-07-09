@@ -155,10 +155,16 @@ export default function MobileScanPage() {
     try {
       if (navigator.vibrate) navigator.vibrate(50);
 
-      // CEK DUPLIKAT: Cek apakah resi sudah ada di session MANAPUN (semua session)
+      // CEK DUPLIKAT: Cek dengan memastikan penanganan jika data dikembalikan berupa array atau objek
       const { data: existingResi, error: checkError } = await supabase
         .from('sorting_details')
-        .select('session_id, sorting_sessions(session_code, status)')
+        .select(`
+          session_id,
+          sorting_sessions (
+            session_code,
+            status
+          )
+        `)
         .eq('barcode_resi', barcodeValue)
         .maybeSingle();
 
@@ -166,7 +172,10 @@ export default function MobileScanPage() {
 
       // Jika resi sudah ada di session manapun
       if (existingResi) {
-        const sessionData = existingResi.sorting_sessions as any;
+        // ANTISIPASI: Jika hasil relasi berupa array, ambil indeks ke-0. Jika objek, ambil langsung.
+        const sessionRaw = existingResi.sorting_sessions;
+        const sessionData = Array.isArray(sessionRaw) ? sessionRaw[0] : sessionRaw;
+        
         const sessionCode = sessionData?.session_code || 'unknown';
         const sessionStatus = sessionData?.status || 'unknown';
         
@@ -183,7 +192,7 @@ export default function MobileScanPage() {
         return;
       }
 
-      // Jika resi belum ada, lanjutkan proses sorting
+      // Jika resi belum ada, lanjutkan proses otomatisasi RPC database
       const { data, error } = await supabase.rpc('process_auto_sorting', {
         p_barcode: barcodeValue,
         p_operator_id: operatorId,
