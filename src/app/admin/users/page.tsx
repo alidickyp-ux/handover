@@ -3,18 +3,17 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { showToast } from '@/components/common/ToastContainer';
-import { User } from '@/types';
+import { User, UserRole } from '@/types';
 
-export default function UsersManagementPage() {
+export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form state
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'ADMIN' | 'OPERATOR'>('OPERATOR');
+  const [role, setRole] = useState<UserRole>('OPERATOR');
 
   useEffect(() => {
     fetchUsers();
@@ -45,7 +44,6 @@ export default function UsersManagementPage() {
     const internalEmail = `${username.trim().toLowerCase()}@cool.internal`;
 
     try {
-      // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: internalEmail,
         password: password,
@@ -57,7 +55,6 @@ export default function UsersManagementPage() {
       if (authError) throw authError;
       if (!authData.user) throw new Error('Gagal membuat akun');
 
-      // Create user profile
       const { error: profileError } = await supabase.from('users').insert([
         {
           id: authData.user.id,
@@ -92,11 +89,7 @@ export default function UsersManagementPage() {
       if (error) throw error;
 
       const newStatus = !currentStatus;
-      showToast(
-        `User berhasil ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}`,
-        'success',
-        3000
-      );
+      showToast(`User berhasil ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}`, 'success', 3000);
       fetchUsers();
     } catch (error) {
       console.error('Error toggling user status:', error);
@@ -120,15 +113,12 @@ export default function UsersManagementPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <header className="flex justify-between items-center pb-6 border-b border-slate-200/50">
         <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent tracking-tight">
             Manajemen Pengguna
           </h1>
-          <p className="text-sm text-slate-500 mt-1 font-medium">
-            Kelola hak akses dan aktivasi akun operator
-          </p>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Kelola hak akses dan aktivasi akun operator</p>
         </div>
         <div className="flex items-center space-x-3">
           <span className="text-sm text-slate-600 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-200/50 shadow-sm">
@@ -138,7 +128,6 @@ export default function UsersManagementPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl shadow-slate-200/30 p-6 border border-white/50 h-fit">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-200/50">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-200/50">
@@ -154,9 +143,7 @@ export default function UsersManagementPage() {
 
           <form onSubmit={handleCreateUser} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                Nama Lengkap
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Nama Lengkap</label>
               <input
                 type="text"
                 required
@@ -168,9 +155,7 @@ export default function UsersManagementPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                Username Login
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Username Login</label>
               <input
                 type="text"
                 required
@@ -182,9 +167,7 @@ export default function UsersManagementPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                Password
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
               <input
                 type="password"
                 required
@@ -196,16 +179,15 @@ export default function UsersManagementPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                Role Akses
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Role Akses</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as 'ADMIN' | 'OPERATOR')}
+                onChange={(e) => setRole(e.target.value as UserRole)}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-50/50 border-2 border-slate-200/50 text-slate-800 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all duration-200"
               >
                 <option value="OPERATOR">👤 OPERATOR GUDANG</option>
                 <option value="ADMIN">👑 ADMIN INVENTORY</option>
+                <option value="SECURITY">🔒 SECURITY</option>
               </select>
             </div>
 
@@ -234,7 +216,6 @@ export default function UsersManagementPage() {
           </form>
         </div>
 
-        {/* Table */}
         <div className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl shadow-slate-200/30 border border-white/50 overflow-hidden">
           <div className="p-4 border-b border-slate-200/50 flex justify-between items-center bg-gradient-to-r from-slate-50/50 to-white">
             <div className="flex items-center gap-2">
@@ -289,11 +270,11 @@ export default function UsersManagementPage() {
                       </td>
                       <td className="p-3">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-medium ${
-                          user.role === 'ADMIN'
-                            ? 'bg-purple-50 text-purple-600 border border-purple-200/50'
-                            : 'bg-blue-50 text-blue-600 border border-blue-200/50'
+                          user.role === 'ADMIN' ? 'bg-purple-50 text-purple-600 border border-purple-200/50' :
+                          user.role === 'SECURITY' ? 'bg-amber-50 text-amber-600 border border-amber-200/50' :
+                          'bg-blue-50 text-blue-600 border border-blue-200/50'
                         }`}>
-                          {user.role === 'ADMIN' ? '👑' : '👤'} {user.role}
+                          {user.role === 'ADMIN' ? '👑' : user.role === 'SECURITY' ? '🔒' : '👤'} {user.role}
                         </span>
                       </td>
                       <td className="p-3">
@@ -308,9 +289,8 @@ export default function UsersManagementPage() {
                         <button
                           onClick={() => toggleUserStatus(user.id, user.is_active)}
                           className={`px-3 py-1 rounded-lg border transition-all duration-200 text-xs font-medium ${
-                            user.is_active
-                              ? 'border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-sm'
-                              : 'border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 shadow-sm'
+                            user.is_active ? 'border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-sm' :
+                            'border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 shadow-sm'
                           }`}
                         >
                           {user.is_active ? 'Nonaktifkan' : 'Aktifkan'}

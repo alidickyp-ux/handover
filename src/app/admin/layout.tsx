@@ -1,26 +1,30 @@
 'use client';
 
-import { useAuth } from '@/hooks/useAuth';
-import Sidebar from '@/components/dashboard/Sidebar';
-import ToastContainer from '@/components/common/ToastContainer';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import Sidebar from '@/components/admin/Sidebar';
+import ToastContainer from '@/components/common/ToastContainer';
 
-export default function DashboardLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/');
+    if (!loading && isChecking) {
+      setIsChecking(false);
+      if (!user) {
+        router.replace('/');
+      }
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isChecking]);
 
-  if (loading) {
+  if (loading || isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <div className="flex items-center gap-3 text-slate-400">

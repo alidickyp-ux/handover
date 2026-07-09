@@ -1,9 +1,12 @@
+export type UserRole = 'ADMIN' | 'OPERATOR' | 'SECURITY';
+
 export interface User {
   id: string;
   full_name: string;
-  role: 'ADMIN' | 'OPERATOR';
+  role: UserRole;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface SortingSession {
@@ -14,6 +17,7 @@ export interface SortingSession {
   operator_id: string;
   operator_name?: string;
   total_items: number;
+  transporter_id?: number;
   transporter_name?: string;
 }
 
@@ -23,6 +27,14 @@ export interface SortingDetail {
   barcode_resi: string;
   scanned_at: string;
   is_validated_handover: boolean;
+}
+
+export interface MasterTransporter {
+  id: number;
+  transporter_name: string;
+  tracking_prefix: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface HistoryLog {
@@ -41,13 +53,6 @@ export interface HistoryLog {
   driver_sign?: string;
 }
 
-export interface MasterTransporter {
-  id: string;
-  transporter_name: string;
-  prefix_code: string;
-  is_active: boolean;
-}
-
 export interface ToastProps {
   message: string;
   type?: 'success' | 'error' | 'info' | 'warning';
@@ -61,4 +66,11 @@ export interface StatsCardProps {
   icon: React.ReactNode;
   color?: 'emerald' | 'blue' | 'amber' | 'violet';
   subtitle?: string;
+}
+
+export interface ScanResult {
+  success: boolean;
+  message: string;
+  session_code?: string;
+  transporter?: string;
 }

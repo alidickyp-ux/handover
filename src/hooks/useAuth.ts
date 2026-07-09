@@ -6,33 +6,41 @@ import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
 
 export function useAuth() {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          setLoading(false);
+          return;
+        }
+
+        setSession(session);
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (!error && data) {
+          setUser(data);
+        } else {
+          // Jika user tidak ditemukan, logout
+          await supabase.auth.signOut();
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('useAuth error:', error);
+        setUser(null);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setSession(session);
-      
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!error && data) {
-        setUser(data);
-      }
-      
-      setLoading(false);
     };
 
     getUser();
@@ -42,7 +50,6 @@ export function useAuth() {
         if (event === 'SIGNED_OUT') {
           setUser(null);
           setSession(null);
-          router.push('/');
         } else if (event === 'SIGNED_IN' && session) {
           setSession(session);
           const { data } = await supabase
@@ -51,6 +58,7 @@ export function useAuth() {
             .eq('id', session.user.id)
             .single();
           if (data) setUser(data);
+          setLoading(false);
         }
       }
     );
@@ -58,12 +66,27 @@ export function useAuth() {
     return () => {
       listener?.subscription.unsubscribe();
     };
-  }, [router]);
+  }, []);
 
   const logout = async () => {
     await supabase.auth.signOut();
-    router.push('/');
+    setUser(null);
+    setSession(null);
   };
 
-  return { user, session, loading, logout };
+  // Role checks
+  const isAdmin = user?.role === 'ADMIN';
+  const isOperator = user?.role === 'OPERATOR';
+  const isSecurity = user?.role === 'SECURITY';
+
+  return { 
+    user, 
+    session, 
+    loading, 
+    logout,
+    isAdmin,
+    isOperator,
+    isSecurity,
+    role: user?.role 
+  };
 }
