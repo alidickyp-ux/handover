@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  // Public paths - tidak perlu auth
   const publicPaths = ['/', '/login'];
   if (publicPaths.includes(path)) {
     return NextResponse.next();
@@ -39,6 +40,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Jika tidak ada user, redirect ke login
   if (!user) {
     return NextResponse.redirect(new URL('/', request.url));
   }
@@ -51,20 +53,53 @@ export async function middleware(request: NextRequest) {
 
   const role = userData?.role || 'OPERATOR';
 
-  const adminPaths = ['/dashboard', '/history', '/users'];
-  const operatorPaths = ['/sorting', '/handover', '/menu'];
+  // =========================================================
+  // ROLE-BASED PATH PROTECTION
+  // =========================================================
 
-  if (role === 'ADMIN' && operatorPaths.some(p => path.startsWith(p))) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+  // Admin only paths
+  const adminPaths = ['/dashboard', '/admin', '/history', '/users'];
+  
+  // Operator paths (bisa diakses oleh ADMIN juga)
+  const operatorPaths = ['/sorting', '/handover'];
+
+  // =========================================================
+  // RULES:
+  // 1. ADMIN bisa akses SEMUA path (admin + operator)
+  // 2. OPERATOR hanya bisa akses operator paths
+  // 3. SECURITY hanya bisa akses /handover
+  // =========================================================
+
+  // Jika ADMIN → izinkan SEMUA akses
+  if (role === 'ADMIN') {
+    // Admin boleh akses semua, termasuk operator paths
+    return response;
   }
-  if (role === 'OPERATOR' && adminPaths.some(p => path.startsWith(p))) {
+
+  // Jika OPERATOR → hanya boleh akses operator paths
+  if (role === 'OPERATOR') {
+    // Jika operator mencoba akses admin path → redirect ke sorting
+    if (adminPaths.some(p => path.startsWith(p))) {
+      return NextResponse.redirect(new URL('/sorting', request.url));
+    }
+    // Jika operator akses operator path → izinkan
+    if (operatorPaths.some(p => path.startsWith(p))) {
+      return response;
+    }
+    // Selain itu redirect ke sorting
     return NextResponse.redirect(new URL('/sorting', request.url));
   }
-  if (role === 'SECURITY' && path !== '/handover') {
-    return NextResponse.redirect(new URL('/handover', request.url));
+
+  // Jika SECURITY → hanya boleh akses /handover
+  if (role === 'SECURITY') {
+    if (path !== '/handover') {
+      return NextResponse.redirect(new URL('/handover', request.url));
+    }
+    return response;
   }
 
-  return response;
+  // Default redirect ke sorting
+  return NextResponse.redirect(new URL('/sorting', request.url));
 }
 
 export const config = {
